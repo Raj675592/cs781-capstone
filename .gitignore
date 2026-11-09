@@ -13,7 +13,7 @@ artifacts/
 lsi_artifacts/
 
 # submission archives
-*.zip
+
 
 # python / notebook junk
 __pycache__/
