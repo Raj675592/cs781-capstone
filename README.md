@@ -13,7 +13,7 @@ prediction, statute identification, summarization and prior-case retrieval.
 No pretrained language-model weights and no external legal data are used.
 
 This repository contains code only. It does not contain datasets, model weights
-or checkpoints (see "Data and checkpoints").
+or checkpoints (see "Data and checkpoints"). The Phase-1 tokenizer is produced by `phase1/phase1.ipynb`.
 
 ## Results (Codabench, ranks as of 9 November 2026)
 
@@ -27,7 +27,7 @@ or checkpoints (see "Data and checkpoints").
 | 6     | Summarization          | BERTScore F1         | 0.8278     | 101  | 7                 |
 | 7     | Prior case retrieval   | Micro-F1@7           | 0.4808     | 14   | 11                |
 
-Total valid submissions: 54. The full report is in `report/report.pdf`.
+Total valid submissions: 54.
 
 ## Repository layout
 
@@ -36,23 +36,22 @@ cs781-capstone/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
-├── report/                      report.pdf, report.tex, params.pdf, subs.pdf
-├── phase1_legal_lm/             phase1.ipynb, config.py, models.py, tokenizer_train.py,
-│                                prepare_data.py, data_utils.py, train.py, generate.py,
-│                                eval.py, distill.py
-├── phase2_ner/                  phase2.ipynb, config.py, models.py, lner.py
-├── phase3_rhetorical_roles/     phase3.ipynb, config.py, models.py
-├── phase4_judgment_prediction/  phase4.ipynb, p1_models.py, cjpe_prepare.py,
-│                                cjpe_lib.py, cjpe_train.py
-├── phase5_statute_identification/  phase5.ipynb, config.py, models.py
-├── phase6_summarization/        phase6.ipynb, p6text.py, p6lib.py, run_exp.py, infer.py
-└── phase7_prior_case_retrieval/ phase7.ipynb, pcr_lib.py, pcr_prepare.py,
-                                 pcr_train.py, boost_lib.py
+├── phase1/   phase1.ipynb, submission.zip   legal language model pretraining
+├── phase2/   phase2.ipynb, submission.zip   legal NER
+├── phase3/   phase3.ipynb, submission.zip   rhetorical roles
+├── phase4/   phase4.ipynb, submission.zip   judgment prediction
+├── phase5/   phase5.ipynb, submission.zip   statute identification
+├── phase6/   phase6.ipynb, submission.zip   summarization
+└── phase7/   phase7.ipynb, submission.zip   prior case retrieval
 ```
 
-Each phase folder is self-contained. The notebook is the entry point: it writes
-the helper `.py` files next to itself and runs the experiments as resumable
-subprocesses.
+Each phase folder contains one notebook and one submission file. The notebook is
+the entry point and contains all source code: when it runs, it writes its helper
+`.py` files (model, config, training, evaluation and decoding code) with
+`%%writefile` and runs the experiments as resumable subprocesses.
+`submission.zip` is the file that gave our best Codabench score for that phase
+(the score is in the results table below). It holds predictions only, not model
+weights.
 
 ## Environment
 
@@ -81,15 +80,18 @@ Phases 2-7 also need your own Phase-1 outputs as a Kaggle Input:
 `artifacts/tokenizer.json`,
 `artifacts/ckpt_tier1/{decoder_only,efficient,chunk_recurrent,enc_dec}_best.pt`
 and `artifacts/ckpt_tier2/decoder_only_best.pt`. Phase 7 also copies
-`models.py` and `config.py` from the Phase-1 output folder. Run Phase 1 first to
-produce these; they are not included in this repository.
+`models.py` and `config.py` from the Phase-1 output folder (the Phase-1 notebook
+writes them). The checkpoints are model weights and are not included in this
+repository: run `phase1/phase1.ipynb` first to produce them, then save
+its `artifacts/` folder as a Kaggle dataset. The tokenizer (`tokenizer.json`) is also
+produced by that notebook.
 
 Several phases use a file called `train.json`, so add one phase's dataset at a
 time, or use the override variables listed in each phase section.
 
 ## How to run
 
-1. Run `phase1_legal_lm/phase1.ipynb` end to end. It trains the tokenizer,
+1. Run `phase1/phase1.ipynb` end to end. It trains the tokenizer,
    prepares data, trains the four architectures and the Tier-2 model, and
    writes the Phase-1 prediction file. Save its `artifacts/` folder as a Kaggle
    dataset.
@@ -155,7 +157,7 @@ How phases 2-7 use the backbone:
 
 ## Phase 1: Legal language model
 
-Folder `phase1_legal_lm/`, entry point `phase1.ipynb`.
+Folder `phase1/`, entry point `phase1.ipynb`.
 
 - Data: the four corpora (about 19 GB) are streamed with `ijson`, up to 250M
   tokens kept per source, split by document (2% validation). Judgments are
@@ -175,12 +177,14 @@ Folder `phase1_legal_lm/`, entry point `phase1.ipynb`.
 - Fixed bugs: out-of-memory kills from loading all JSON in every process, a
   label off-by-one, a future leak in the chunk-recurrent memory, and an `<eos>`
   appended to the prompt.
-- Best submission: Tier-2 `decoder_only_best.pt` through `generate.py`.
-  [Fill in the exact sampling settings.]
+- Submission: `generate.py` writes `prediction.json` and `submission.zip` from a
+  Phase-1 checkpoint (Tier-2 `decoder_only_best.pt`, `_final.pt`, or the
+  distilled student from `distill.py`), with sampling settings chosen in the
+  decoding sweep cell.
 
 ## Phase 2: Legal NER
 
-Folder `phase2_ner/`, entry point `phase2.ipynb`. Needs all four Phase-1
+Folder `phase2/`, entry point `phase2.ipynb`. Needs all four Phase-1
 checkpoints and the tokenizer.
 
 - Task: 12 entity types, strict character-span macro-F1.
@@ -194,11 +198,16 @@ checkpoints and the tokenizer.
 - Training: mild class weights, differential learning rates (backbone 6e-5, head
   1e-3), optional BiLSTM head and span-boundary head. Top models are refit on
   all 70 labelled documents.
-- Best submission: 0.6022. [Fill in the experiment tag and settings.]
+- Submissions: the notebook writes `official1..4_<arch>_<technique>` (four
+  different Phase-1 models; the set must contain LoRMA and KD and at least three
+  techniques), `extra_span_head_decoder_only` (span-boundary head) and
+  `extra_ensemble` (probability-averaged ensemble), each in `artifacts/submissions/`.
+  Earlier cells also write `strict1..4_*`, `tech_<technique>_<arch>` and
+  `submission_lner.zip`. Best leaderboard score 0.6022.
 
 ## Phase 3: Rhetorical roles
 
-Folder `phase3_rhetorical_roles/`, entry point `phase3.ipynb`.
+Folder `phase3/`, entry point `phase3.ipynb`.
 
 - Task: one of 13 roles per sentence for Corporate Law and Information
   Technology documents, macro-F1.
@@ -211,11 +220,15 @@ Folder `phase3_rhetorical_roles/`, entry point `phase3.ipynb`.
 - Training: one joint CL+IT model, with CL-only and IT-only models as a study.
   Class weights are the square root of inverse frequency, clipped at 10. Final
   models are refit on train+dev with two seeds and averaged.
-- Best submission: 0.5063. [Fill in the experiment tag and settings.]
+- Submissions: the notebook selects the "strict four" (one experiment per
+  Phase-1 architecture, containing LoRMA and KD, highest mean dev macro-F1),
+  refits them on train+dev, and also writes an ensemble, all in
+  `artifacts/submissions/<name>/` (`prediction.json` plus per-domain files).
+  Best leaderboard score 0.5063.
 
 ## Phase 4: Judgment prediction
 
-Folder `phase4_judgment_prediction/`, entry point `phase4.ipynb`. To pin
+Folder `phase4/`, entry point `phase4.ipynb`. To pin
 specific checkpoints, set `CKPT_OVERRIDE`.
 
 - Task: binary court judgment prediction, macro-F1.
@@ -228,11 +241,14 @@ specific checkpoints, set `CKPT_OVERRIDE`.
   E2 adapters on efficient, E3 BitFit on encoder-decoder, E4 distillation into a
   half-depth chunk-recurrent student.
 - Decision: class-weighted cross-entropy and a decision threshold tuned on dev.
-- Best submission: 0.6851. [Fill in the experiment tag and settings.]
+- Submissions: `e1_lorma_decoder_only`, `e2_adapters_efficient`,
+  `e3_bitfit_enc_dec`, `e4_kd_chunk_recurrent`, written as
+  `artifacts/submissions/<tag>.json` with predictions in {0,1} per test case.
+  Best leaderboard score 0.6851.
 
 ## Phase 5: Statute identification
 
-Folder `phase5_statute_identification/`, entry point `phase5.ipynb`. Works with
+Folder `phase5/`, entry point `phase5.ipynb`. Works with
 any subset of the Phase-1 checkpoints. Set `QUICK` for a short run. Optional
 overrides: `DATA_DIR_OVERRIDE`, `TOKENIZER_OVERRIDE`, `CKPT_OVERRIDE`.
 
@@ -246,12 +262,15 @@ overrides: `DATA_DIR_OVERRIDE`, `TOKENIZER_OVERRIDE`, `CKPT_OVERRIDE`.
   temperature-calibrated dev-weighted ensembling, and optional hashed 1-3-gram
   TF-IDF "wide" models. The wide models are not Phase-1 descendants, and the
   ensemble weights use dev labels, so local dev scores for v2 are optimistic.
-- Best submission: 0.4380. [State whether it includes the wide models, and give
-  the experiment tag.]
+- Submissions: the notebook writes one submission per candidate in `CANDS`, plus
+  `FINAL` (best ensemble, which may include the lexical wide models) and
+  `FINAL_neural_only` (Phase-1 models only), under
+  `lsi_artifacts/submissions/<name>/prediction.json`. Best leaderboard score
+  0.4380.
 
 ## Phase 6: Summarization
 
-Folder `phase6_summarization/`, entry point `phase6.ipynb`. Needs all four
+Folder `phase6/`, entry point `phase6.ipynb`. Needs all four
 Phase-1 checkpoints (`{arch}_best.pt`). Optional overrides: `TRAIN_OVERRIDE`,
 `TEST_OVERRIDE`, `TOKENIZER_OVERRIDE`, `P1_CKPT_OVERRIDE`.
 
@@ -267,11 +286,15 @@ Phase-1 checkpoints (`{arch}_best.pt`). Optional overrides: `TRAIN_OVERRIDE`,
 - Adaptation: LoRA, rsLoRA, Pfeiffer adapters and LoRMA (plain,
   permutation-inflated and additive variants), plus cross-architecture
   distillation.
-- Best submission: 0.8278. [Fill in the experiment name and decoding settings.]
+- Submissions: for each Phase-1 architecture the best non-control experiment by
+  validation BERTScore is selected, giving four files
+  `artifacts/submissions/<arch>__<experiment>.json` (list of `{id, summary}`),
+  and the best of them is copied to `submission_best.json`. Set `PINNED` to force
+  a particular experiment. Best leaderboard score 0.8278.
 
 ## Phase 7: Prior case retrieval
 
-Folder `phase7_prior_case_retrieval/`, entry point `phase7.ipynb`. Needs
+Folder `phase7/`, entry point `phase7.ipynb`. Needs
 `decoder_only_best.pt` or `efficient_best.pt`, the tokenizer, and `models.py`
 and `config.py` from the Phase-1 output. Optional overrides: `P1_CKPT`,
 `P1_TOKENIZER`.
@@ -290,82 +313,83 @@ and `config.py` from the Phase-1 output. Optional overrides: `P1_CKPT`,
   feedback tuned on dev.
 - Caveats: BM25 parameters were tuned on train+dev, and Sinkhorn normalisation
   is transductive over the split's score matrix.
-- Best submission: 0.4808. [Fill in the experiment name.]
+- Submissions: `boost_exp1_lorma`, `boost_exp2_ia3`, `boost_exp3_partial`,
+  `boost_exp4_full`, `boost_exp5_kd` (each fuses its own adapted dense model
+  with the lexical ranker), `boost_ensemble_all_runs`, and
+  `REFERENCE_lexical_only_NO_phase1_model` (a reference that uses no Phase-1
+  model), under `artifacts/submissions_boost/`. Best leaderboard score 0.4808.
 
 ## Submissions
 
-Every valid Codabench submission per phase, in the order submitted. The best is
-in bold. Use the experiment tag in the last column to find the code that
-produced it.
+For each phase, the table gives the best valid Codabench submission. That file is
+`phaseX/submission.zip`. The notebook can generate several submission files per
+phase; they are listed under each table.
 
-### Phase 1 (6 valid, 1 failed)
+### Phase 1
 
-| #   | Date   | BERTScore F1         | Model / decoding settings | Tag    |
-| --- | ------ | -------------------- | ------------------------- | ------ |
-| 1-6 | [fill] | [fill] (best 0.8278) | [fill]                    | [fill] |
+| Best score (BERTScore F1) | Rank | Valid submissions | File                      |
+| ------------------------- | ---- | ----------------- | ------------------------- |
+| **0.8278**          | 104  | 6 (+1 failed)     | `phase1/submission.zip` |
 
-### Phase 2 (6 valid)
+Generated by `generate.py` as `prediction.json` and `submission.zip` from a
+Phase-1 checkpoint (Tier-2 `decoder_only_best.pt`, `_final.pt`, or the distilled
+student from `distill.py`) with the sampling settings from the decoding sweep.
 
-| # | Score            | Variant                                                                       |
-| - | ---------------- | ----------------------------------------------------------------------------- |
-| 1 | 0.4075           | v1: union of per-window spans (validation 0.373, precision 0.28, recall 0.52) |
-| 2 | 0.5369           | v2 [fill]                                                                     |
-| 3 | 0.5545           | v2 [fill]                                                                     |
-| 4 | 0.5510           | v2 [fill]                                                                     |
-| 5 | **0.6022** | v2: probability averaging + Viterbi + O-bias [fill tag] (rank 19)             |
-| 6 | 0.4285           | v2 [fill]                                                                     |
+### Phase 2
 
-### Phase 3 (7 valid)
+| Best score (strict span macro-F1) | Rank | Valid submissions | File                      |
+| --------------------------------- | ---- | ----------------- | ------------------------- |
+| **0.6022**                  | 19   | 6                 | `phase2/submission.zip` |
 
-| # | Score            | Variant              |
-| - | ---------------- | -------------------- |
-| 1 | 0.4718           | [fill]               |
-| 2 | 0.4645           | [fill]               |
-| 3 | 0.3908           | [fill]               |
-| 4 | 0.4645           | [fill]               |
-| 5 | 0.5048           | [fill]               |
-| 6 | **0.5063** | [fill tag] (rank 57) |
-| 7 | 0.4662           | [fill]               |
+Generated: `official1..4_<arch>_<technique>`, `extra_span_head_decoder_only`,
+`extra_ensemble`, `strict1..4_*`, `tech_<technique>_<arch>`, `submission_lner.zip`.
+The best score comes from the v2 pipeline (probability averaging, constrained
+Viterbi, O-bias).
 
-### Phase 4 (8 valid)
+### Phase 3
 
-| # | Score            | Variant              |
-| - | ---------------- | -------------------- |
-| 1 | 0.6368           | [fill]               |
-| 2 | 0.5429           | [fill]               |
-| 3 | 0.5429           | [fill]               |
-| 4 | **0.6851** | [fill tag] (rank 89) |
-| 5 | 0.6092           | [fill]               |
-| 6 | 0.5681           | [fill]               |
-| 7 | 0.5960           | [fill]               |
-| 8 | 0.5409           | [fill]               |
+| Best score (macro-F1) | Rank | Valid submissions | File                      |
+| --------------------- | ---- | ----------------- | ------------------------- |
+| **0.5063**      | 57   | 7                 | `phase3/submission.zip` |
 
-### Phase 5 (9 valid)
+Generated: the strict four (one experiment per Phase-1 architecture), their
+train+dev refits, and the ensemble.
 
-| #   | Date   | Score                                                  | Variant                                                  |
-| --- | ------ | ------------------------------------------------------ | -------------------------------------------------------- |
-| 1-7 | 28 Oct | 0.3198, 0.2560, 0.2614, 0.2616, 0.2991, 0.3198, 0.2991 | v1 (distilled enc-dec full FT: 0.3198) [fill the others] |
-| 8   | 9 Nov  | 0.4248                                                 | v2 [fill]                                                |
-| 9   | 9 Nov  | **0.4380**                                       | v2 [fill tag] (rank 14)                                  |
+### Phase 4
 
-### Phase 6 (7 valid)
+| Best score (macro-F1) | Rank | Valid submissions | File                      |
+| --------------------- | ---- | ----------------- | ------------------------- |
+| **0.6851**      | 89   | 8                 | `phase4/submission.zip` |
 
-| # | BERTScore F1     | Variant               |
-| - | ---------------- | --------------------- |
-| 1 | 0.8231           | [fill]                |
-| 2 | 0.8223           | [fill]                |
-| 3 | 0.8217           | [fill]                |
-| 4 | 0.8140           | [fill]                |
-| 5 | 0.8259           | [fill]                |
-| 6 | 0.8263           | [fill]                |
-| 7 | **0.8278** | [fill tag] (rank 101) |
+Generated: `e1_lorma_decoder_only`, `e2_adapters_efficient`, `e3_bitfit_enc_dec`,
+`e4_kd_chunk_recurrent`, and re-thresholded or re-run variants.
 
-### Phase 7 (11 valid)
+### Phase 5
 
-| #    | Date  | Micro-F1@7                                       | Variant                      |
-| ---- | ----- | ------------------------------------------------ | ---------------------------- |
-| 1-6  | 7 Nov | 0.4223, 0.4229, 0.4217, 0.4259, 0.4259, 0.4235   | [fill]                       |
-| 7-11 | 8 Nov | 0.4790, 0.4796, **0.4808**, 0.4784, 0.4755 | [fill] (best is #9, rank 14) |
+| Best score (macro-F1) | Rank | Valid submissions | File                      |
+| --------------------- | ---- | ----------------- | ------------------------- |
+| **0.4380**      | 14   | 9                 | `phase5/submission.zip` |
+
+Generated: one per candidate in `CANDS`, plus `FINAL` (best ensemble, which may
+include the lexical wide models) and `FINAL_neural_only` (Phase-1 models only).
+
+### Phase 6
+
+| Best score (BERTScore F1) | Rank | Valid submissions | File                      |
+| ------------------------- | ---- | ----------------- | ------------------------- |
+| **0.8278**          | 101  | 7                 | `phase6/submission.zip` |
+
+Generated: `<arch>__<experiment>.json` for the four architectures, and the best of
+them as `submission_best.json`.
+
+### Phase 7
+
+| Best score (Micro-F1@7) | Rank | Valid submissions | File                      |
+| ----------------------- | ---- | ----------------- | ------------------------- |
+| **0.4808**        | 14   | 11                | `phase7/submission.zip` |
+
+Generated: `boost_exp1_lorma`, `boost_exp2_ia3`, `boost_exp3_partial`,
+`boost_exp4_full`, `boost_exp5_kd`, `boost_ensemble_all_runs`.
 
 ## Notes and limitations
 
@@ -378,5 +402,4 @@ produced it.
 ## LLM use
 
 Claude (Anthropic) was used for clarifying concepts, debugging help, figure code
-and grammar and wording of the report. See the LLM Usage Declaration in
-`report/report.pdf`.
+and grammar and wording of the report. See the LLM Usage Declaration in the project report.
