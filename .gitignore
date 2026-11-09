@@ -1,0 +1,22 @@
+# model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# datasets and generated data
+*.bin
+*.npy
+*.npz
+*.pkl
+data/
+artifacts/
+lsi_artifacts/
+
+# submission archives
+*.zip
+
+# python / notebook junk
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
