@@ -102,6 +102,56 @@ time, or use the override variables listed in each phase section.
    finished experiments are skipped after a session restart. Set the `FORCE*`
    flag in a notebook to retrain.
 
+## Experimental setup
+
+**Compute.** Kaggle T4 or P100 GPUs, 12-hour sessions, fp16 autocast with
+GradScaler (bf16 on Ampere or newer). Each experiment is a subprocess that
+writes checkpoints and score files, so finished work is skipped after a session
+kill. All runs use AdamW with warmup, cosine decay and gradient clipping at 1.0.
+
+**Typical budgets.** Tier-1 pretraining 1,500 steps; Tier-2 up to 180 minutes
+(5,000 planned steps); P2 2,400 steps; P3 2,500 steps; P4 up to 60 minutes per
+main run (3 epochs); P5 6 epochs; P6 800 steps (about 2 epochs, 18-28 minutes);
+P7 800 steps (60-minute cap).
+
+**Hyperparameters of the final configurations.**
+
+| | P1 | P2 | P3 | P4 | P5 | P6 | P7 |
+|---|---|---|---|---|---|---|---|
+| Parameters (M) | 101.9 | 57-102 | 57-102 | 51-102 | 51-102 | 51-102 | 57-102 |
+| Context | 1024 | 512 | 512 | 512 x 4 windows | 512 x 8 windows | 1024 | 512 x 10 chunks |
+| Peak LR | 3e-4 | 6e-5 backbone / 1e-3 head | 5e-5 (+ head) | 5e-5 to 1e-3 | 1e-4 to 6e-4 | 5e-5 to 2e-4 | 2e-5 to 3e-3 |
+| Batch x accumulation | 8 x 4 | 4 | 8 | 2 x 8 | 4 x 4 | 4 x 4 | 8 queries |
+| Steps / epochs | 5000 | 2400 | 2500 | 3 ep | 6 ep | 800 | 800 |
+| Dropout | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 | 0.05 | 0 |
+| Decoding / thresholds | top-p 0.9 | O-bias, Viterbi | Viterbi lambda | tuned threshold | tuned thresholds | beam 4 | Sinkhorn, PRF |
+
+Learning-rate ranges span full fine-tuning (low) to PEFT, BitFit and IA3 (high).
+
+**Model selection.** Validation loss (P1), strict span macro-F1 (P2), dev macro-F1
+(P3-P5), validation loss then BERTScore (P6), dev F1@7 (P7).
+
+**Local evaluation.**
+- P1: 2% document-level held-out text and a fixed equal-weight validation set,
+  plus held-out (512-word prompt, 128-word reference) pairs scored by BERTScore,
+  ROUGE-L and BLEU-4.
+- P2: 20% document split (14 documents).
+- P6: 200 held-out training documents, with generation scored on 50.
+- P7: 118 dev queries, so differences of 0.01-0.02 are within noise.
+
+Local and leaderboard scores diverged most in P2 (0.373 vs 0.4075 for v1) and P7,
+so close variants were judged by Codabench.
+
+**Ablations and controlled comparisons.** One factor changed at a time:
+tokenizer vocabulary (16k / 32k / 50k); data mix (uniform vs judgment-heavy);
+context length 512 vs 1024; regularisation (weight decay 0.1 vs 0.3); best vs
+final checkpoint; decoding sweeps; P3 context ablations (sentence-only, window,
+BiLSTM, causal vs bidirectional, position features, class balancing, random
+init); P4 representations (head, tail, head+tail with mean, attention or
+transformer pooling) and a section study; P6 length, repetition and copy-bias
+sweeps and a random-init control; P7 per-stage gains from lexical scorers, the
+learned ranker, dense scores, Sinkhorn and PRF.
+
 ## Shared design
 
 - Tokenizer: byte-level BPE, 32k vocabulary, trained on a sample of all four
