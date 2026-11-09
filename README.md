@@ -1,4 +1,3 @@
-
 # CS781 Capstone: In-House Legal Intelligence System
 
 Rajkumar Ahirwar, Roll No. 240836, IIT Kanpur (rajkumar24@iitk.ac.in)
@@ -17,15 +16,15 @@ or checkpoints (see "Data and checkpoints"). The Phase-1 tokenizer is produced b
 
 ## Results (Codabench, ranks as of 9 November 2026)
 
-| Phase | Task                   | Primary metric       | Best score | Rank | Valid submissions |
-| ----- | ---------------------- | -------------------- | ---------- | ---- | ----------------- |
-| 1     | Legal LM pretraining   | BERTScore F1         | 0.8278     | 104  | 6 (+1 failed)     |
-| 2     | Legal NER              | strict span macro-F1 | 0.6022     | 19   | 6                 |
-| 3     | Rhetorical roles       | macro-F1             | 0.5063     | 57   | 7                 |
-| 4     | Judgment prediction    | macro-F1             | 0.6851     | 89   | 8                 |
-| 5     | Statute identification | macro-F1             | 0.4380     | 14   | 9                 |
-| 6     | Summarization          | BERTScore F1         | 0.8278     | 101  | 7                 |
-| 7     | Prior case retrieval   | Micro-F1@7           | 0.4808     | 14   | 11                |
+| Phase | Task | Primary metric | Best score | Rank | Valid submissions |
+|---|---|---|---|---|---|
+| 1 | Legal LM pretraining | BERTScore F1 | 0.8278 | 104 | 6 (+1 failed) |
+| 2 | Legal NER | strict span macro-F1 | 0.6022 | 19 | 6 |
+| 3 | Rhetorical roles | macro-F1 | 0.5063 | 57 | 7 |
+| 4 | Judgment prediction | macro-F1 | 0.6851 | 89 | 8 |
+| 5 | Statute identification | macro-F1 | 0.4380 | 14 | 9 |
+| 6 | Summarization | BERTScore F1 | 0.8278 | 101 | 7 |
+| 7 | Prior case retrieval | Micro-F1@7 | 0.4808 | 14 | 11 |
 
 Total valid submissions: 54.
 
@@ -66,15 +65,15 @@ The datasets are the course files and are not redistributed here. The notebooks
 search `/kaggle/input` recursively, so add each dataset as a Kaggle Input with
 these filenames:
 
-| Phase | Required input files                                                                                                                                                |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | `train_acts.json`, `train_high_courts.json`, `train_supreme_court.json`, `train_tribunals.json`, and the test file (`test.json` or `Phase1- Test.json`) |
-| 2     | `fold1-text.json`, `fold1-gold.json`, `fold2-text.json`, `fold2-gold.json`, `fold3-text.json`, `labels.txt`                                             |
-| 3     | `CL_train.json`, `IT_train.json`, `CL_dev.json`, `IT_dev.json`, `CL_test.json`, `IT_test.json`, `label_vocab.json`                                    |
-| 4     | `train.json`, `dev.json`, `test.json`                                                                                                                         |
-| 5     | `Train/train.json`, `Train/dev.json`, `Test/test.json`                                                                                                        |
-| 6     | `train.json` (fields `id`, `document`, `summary`), `test.json`                                                                                            |
-| 7     | `train.json`, `train_candidates.json`, `dev.json`, `dev_candidates.json`, `test.json`, `test_candidates.json`                                           |
+| Phase | Required input files |
+|---|---|
+| 1 | `train_acts.json`, `train_high_courts.json`, `train_supreme_court.json`, `train_tribunals.json`, and the test file (`test.json` or `Phase1- Test.json`) |
+| 2 | `fold1-text.json`, `fold1-gold.json`, `fold2-text.json`, `fold2-gold.json`, `fold3-text.json`, `labels.txt` |
+| 3 | `CL_train.json`, `IT_train.json`, `CL_dev.json`, `IT_dev.json`, `CL_test.json`, `IT_test.json`, `label_vocab.json` |
+| 4 | `train.json`, `dev.json`, `test.json` |
+| 5 | `Train/train.json`, `Train/dev.json`, `Test/test.json` |
+| 6 | `train.json` (fields `id`, `document`, `summary`), `test.json` |
+| 7 | `train.json`, `train_candidates.json`, `dev.json`, `dev_candidates.json`, `test.json`, `test_candidates.json` |
 
 Phases 2-7 also need your own Phase-1 outputs as a Kaggle Input:
 `artifacts/tokenizer.json`,
@@ -116,12 +115,12 @@ time, or use the override variables listed in each phase section.
 
 ## Model architecture
 
-| Architecture    | Key components                                                                                          | Tier-1 size               |
-| --------------- | ------------------------------------------------------------------------------------------------------- | ------------------------- |
-| decoder-only    | RoPE, grouped-query attention (GQA), causal mask                                                        | 57.4M (d=640, 8 layers)   |
-| efficient       | local sliding-window attention (128), full attention every 4th block                                    | 57.4M                     |
-| encoder-decoder | learned positions, bidirectional encoder, cross-attention decoder                                       | 61.6M (d=512, 6+6 layers) |
-| chunk-recurrent | GRU compresses 128-token chunks into memory; the decoder cross-attends to memory of earlier chunks only | 51.3M                     |
+| Architecture | Key components | Tier-1 size |
+|---|---|---|
+| decoder-only | RoPE, grouped-query attention (GQA), causal mask | 57.4M (d=640, 8 layers) |
+| efficient | local sliding-window attention (128), full attention every 4th block | 57.4M |
+| encoder-decoder | learned positions, bidirectional encoder, cross-attention decoder | 61.6M (d=512, 6+6 layers) |
+| chunk-recurrent | GRU compresses 128-token chunks into memory; the decoder cross-attends to memory of earlier chunks only | 51.3M |
 
 Tier-2 model (used for Phase 1): decoder-only, d=768, 12 layers, 12 heads, 4 KV
 heads, 101.9M parameters (tied embedding 24.6M plus 12 blocks of 6.44M),
@@ -129,14 +128,14 @@ context 1024.
 
 How phases 2-7 use the backbone:
 
-| Phase | Attention mask                   | Techniques compared                                                 |
-| ----- | -------------------------------- | ------------------------------------------------------------------- |
-| 2     | bidirectional                    | LoRMA, full FT, KD                                                  |
-| 3     | bidirectional (causal ablated)   | joint vs per-domain, linear vs BiLSTM head, KD, random-init control |
-| 4     | causal, mean-pool                | E1 LoRMA, E2 adapters, E3 BitFit, E4 KD                             |
-| 5     | causal (enc-dec: native encoder) | LoRMA, partial FT, adapters, distilled full FT                      |
-| 6     | causal generator                 | LoRA, rsLoRA, Pfeiffer, LoRMA variants, KD                          |
-| 7     | causal, position-weighted mean   | LoRMA, IA3, last-two-block FT, full FT, KD                          |
+| Phase | Attention mask | Techniques compared |
+|---|---|---|
+| 2 | bidirectional | LoRMA, full FT, KD |
+| 3 | bidirectional (causal ablated) | joint vs per-domain, linear vs BiLSTM head, KD, random-init control |
+| 4 | causal, mean-pool | E1 LoRMA, E2 adapters, E3 BitFit, E4 KD |
+| 5 | causal (enc-dec: native encoder) | LoRMA, partial FT, adapters, distilled full FT |
+| 6 | causal generator | LoRA, rsLoRA, Pfeiffer, LoRMA variants, KD |
+| 7 | causal, position-weighted mean | LoRMA, IA3, last-two-block FT, full FT, KD |
 
 ## Implementation details
 
@@ -326,6 +325,7 @@ For each phase, the table gives the best valid Codabench submission. That file i
 phase; they are listed under each table.
 
 ### Phase 1
+<<<<<<< HEAD
 
 | Best score (BERTScore F1) | Rank | Valid submissions | File                      |
 | ------------------------- | ---- | ----------------- | ------------------------- |
@@ -388,6 +388,63 @@ them as `submission_best.json`.
 | ----------------------- | ---- | ----------------- | ------------------------- |
 | **0.4808**        | 14   | 11                | `phase7/submission.zip` |
 
+=======
+| Best score (BERTScore F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.8278** | 104 | 6 (+1 failed) | `phase1/submission.zip` |
+
+Generated by `generate.py` as `prediction.json` and `submission.zip` from a
+Phase-1 checkpoint (Tier-2 `decoder_only_best.pt`, `_final.pt`, or the distilled
+student from `distill.py`) with the sampling settings from the decoding sweep.
+
+### Phase 2
+| Best score (strict span macro-F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.6022** | 19 | 6 | `phase2/submission.zip` |
+
+Generated: `official1..4_<arch>_<technique>`, `extra_span_head_decoder_only`,
+`extra_ensemble`, `strict1..4_*`, `tech_<technique>_<arch>`, `submission_lner.zip`.
+The best score comes from the v2 pipeline (probability averaging, constrained
+Viterbi, O-bias).
+
+### Phase 3
+| Best score (macro-F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.5063** | 57 | 7 | `phase3/submission.zip` |
+
+Generated: the strict four (one experiment per Phase-1 architecture), their
+train+dev refits, and the ensemble.
+
+### Phase 4
+| Best score (macro-F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.6851** | 89 | 8 | `phase4/submission.zip` |
+
+Generated: `e1_lorma_decoder_only`, `e2_adapters_efficient`, `e3_bitfit_enc_dec`,
+`e4_kd_chunk_recurrent`, and re-thresholded or re-run variants.
+
+### Phase 5
+| Best score (macro-F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.4380** | 14 | 9 | `phase5/submission.zip` |
+
+Generated: one per candidate in `CANDS`, plus `FINAL` (best ensemble, which may
+include the lexical wide models) and `FINAL_neural_only` (Phase-1 models only).
+
+### Phase 6
+| Best score (BERTScore F1) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.8278** | 101 | 7 | `phase6/submission.zip` |
+
+Generated: `<arch>__<experiment>.json` for the four architectures, and the best of
+them as `submission_best.json`.
+
+### Phase 7
+| Best score (Micro-F1@7) | Rank | Valid submissions | File |
+|---|---|---|---|
+| **0.4808** | 14 | 11 | `phase7/submission.zip` |
+
+>>>>>>> 4a55f431bb9774bb6a425b08d04b59692c3a5d26
 Generated: `boost_exp1_lorma`, `boost_exp2_ia3`, `boost_exp3_partial`,
 `boost_exp4_full`, `boost_exp5_kd`, `boost_ensemble_all_runs`.
 
